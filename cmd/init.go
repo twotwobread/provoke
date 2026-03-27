@@ -39,11 +39,15 @@ func runInit(cmd *cobra.Command, args []string) error {
 	}
 
 	// Cloud provider
+	validProviders := map[string]bool{"gcp": true, "aws": true, "azure": true}
 	fmt.Print("Cloud provider (gcp/aws/azure) [gcp]: ")
 	provider, _ := reader.ReadString('\n')
 	provider = strings.TrimSpace(provider)
 	if provider == "" {
 		provider = "gcp"
+	}
+	if !validProviders[provider] {
+		return fmt.Errorf("unsupported provider %q (supported: gcp, aws, azure)", provider)
 	}
 
 	// Create .provoke/<project-name>/ directory
@@ -52,16 +56,21 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("create project dir: %w", err)
 	}
 
-	// Write initial state.json
-	initialState := map[string]any{
-		"project":   name,
-		"provider":  provider,
-		"resources": []any{},
-	}
-	stateData, _ := json.MarshalIndent(initialState, "", "  ")
+	// Write initial state.json — skip if already exists to avoid overwriting resource history.
 	statePath := filepath.Join(projectDir, "state.json")
-	if err := os.WriteFile(statePath, stateData, 0644); err != nil {
-		return fmt.Errorf("write state.json: %w", err)
+	if _, err := os.Stat(statePath); os.IsNotExist(err) {
+		initialState := map[string]any{
+			"project":   name,
+			"provider":  provider,
+			"resources": []any{},
+		}
+		stateData, err := json.MarshalIndent(initialState, "", "  ")
+		if err != nil {
+			return fmt.Errorf("marshal state.json: %w", err)
+		}
+		if err := os.WriteFile(statePath, stateData, 0644); err != nil {
+			return fmt.Errorf("write state.json: %w", err)
+		}
 	}
 
 	// Create empty main.tf and variables.tf
