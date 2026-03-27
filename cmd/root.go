@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -10,13 +11,16 @@ import (
 var rootCmd = &cobra.Command{
 	Use:   "provoke [query]",
 	Short: "Provision infrastructure by invoking it in plain language",
-	Args:  cobra.MaximumNArgs(1),
+	Args: cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			_ = cmd.Help()
 			return
 		}
-		fmt.Println("query:", args[0]) // placeholder — Task 9에서 구현
+		// Join all args so both quoted and unquoted queries work:
+		// provoke "scale to 2 nodes"  →  args[0]
+		// provoke scale to 2 nodes    →  strings.Join(args, " ")
+		fmt.Println("query:", strings.Join(args, " ")) // placeholder — implemented in Task 9
 	},
 }
 
