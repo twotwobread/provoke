@@ -83,7 +83,7 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	builder := provoke_context.NewBuilder(s, tfContent, provider)
 
 	fmt.Println("Generating Terraform configuration...")
-	newTF, err := client.Generate(context.Background(), builder.SystemPrompt(), query)
+	newTF, err := client.Generate(cmd.Context(), builder.SystemPrompt(), query)
 	if err != nil {
 		return fmt.Errorf("LLM generation failed: %w", err)
 	}
@@ -91,7 +91,9 @@ func runQuery(cmd *cobra.Command, args []string) error {
 
 	// 7. Backup and write new .tf
 	backupPath := tfPath + ".bak"
-	_ = os.WriteFile(backupPath, []byte(tfContent), 0644)
+	if err := os.WriteFile(backupPath, []byte(tfContent), 0644); err != nil {
+		return fmt.Errorf("backup main.tf: %w", err)
+	}
 	if err := os.WriteFile(tfPath, []byte(newTF), 0644); err != nil {
 		return fmt.Errorf("write main.tf: %w", err)
 	}
@@ -100,14 +102,18 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	runner := terraform.NewRunner(projectDir)
 	fmt.Println("Running terraform init...")
 	if err := runner.Init(); err != nil {
-		_ = rollback(tfPath, backupPath)
+		if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+		}
 		return fmt.Errorf("terraform init failed: %w", err)
 	}
 
 	fmt.Println("Running terraform plan...")
 	planOutput, err := runner.Plan()
 	if err != nil {
-		_ = rollback(tfPath, backupPath)
+		if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+		}
 		return fmt.Errorf("terraform plan failed: %w", err)
 	}
 
@@ -118,13 +124,15 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	answer, _ := reader.ReadString('\n')
 	answer = strings.TrimSpace(strings.ToLower(answer))
 	if answer != "y" {
-		_ = rollback(tfPath, backupPath)
+		if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+			fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+		}
 		fmt.Println("Cancelled.")
 		return nil
 	}
 
 	// 10. Apply with self-healing (max 2 retries)
-	if err := applyWithHealing(runner, client, builder, tfPath, backupPath, 2); err != nil {
+	if err := applyWithHealing(cmd.Context(), runner, client, builder, tfPath, backupPath, 2); err != nil {
 		return err
 	}
 
@@ -145,28 +153,38 @@ func runQuery(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func applyWithHealing(runner *terraform.Runner, client llm.LLMClient, builder *provoke_context.Builder, tfPath, backupPath string, maxRetries int) error {
+func applyWithHealing(ctx context.Context, runner *terraform.Runner, client llm.LLMClient, builder *provoke_context.Builder, tfPath, backupPath string, maxRetries int) error {
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		err := runner.Apply()
 		if err == nil {
 			return nil
 		}
 		if attempt == maxRetries {
-			_ = rollback(tfPath, backupPath)
+			if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+			}
 			return fmt.Errorf("terraform apply failed after %d retries: %w", maxRetries, err)
 		}
 
 		fmt.Printf("\nApply failed. Attempting self-healing (%d/%d)...\n", attempt+1, maxRetries)
 
-		fixPrompt := fmt.Sprintf("The following terraform apply error occurred:\n\n%v\n\nPlease fix the terraform configuration.", err)
-		fixedTF, llmErr := client.Generate(context.Background(), builder.SystemPrompt(), fixPrompt)
+		currentTF, _ := os.ReadFile(tfPath)
+		fixPrompt := fmt.Sprintf(
+			"The following terraform apply error occurred:\n\n%v\n\nCurrent main.tf content:\n\n%s\n\nPlease fix the terraform configuration.",
+			err, string(currentTF),
+		)
+		fixedTF, llmErr := client.Generate(ctx, builder.SystemPrompt(), fixPrompt)
 		if llmErr != nil {
-			_ = rollback(tfPath, backupPath)
+			if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+			}
 			return fmt.Errorf("self-healing LLM call failed: %w", llmErr)
 		}
 		fixedTF = llm.ExtractTFContent(fixedTF)
 		if err := os.WriteFile(tfPath, []byte(fixedTF), 0644); err != nil {
-			_ = rollback(tfPath, backupPath)
+			if rbErr := rollback(tfPath, backupPath); rbErr != nil {
+				fmt.Fprintf(os.Stderr, "warning: rollback failed: %v\n", rbErr)
+			}
 			return err
 		}
 	}
