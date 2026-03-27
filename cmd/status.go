@@ -21,7 +21,11 @@ func init() {
 }
 
 func runStatus(cmd *cobra.Command, args []string) error {
-	projectDir, err := findProjectDir()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+	projectDir, err := findProjectDir(cwd)
 	if err != nil {
 		return err
 	}
@@ -47,14 +51,11 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// findProjectDir finds the first .provoke/<project>/ directory in cwd.
-func findProjectDir() (string, error) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	provokDir := filepath.Join(cwd, ".provoke")
-	entries, err := os.ReadDir(provokDir)
+// findProjectDir finds the single .provoke/<project>/ directory under root.
+// Accepts root as a parameter to allow testing without os.Chdir.
+func findProjectDir(root string) (string, error) {
+	provokeDir := filepath.Join(root, ".provoke")
+	entries, err := os.ReadDir(provokeDir)
 	if os.IsNotExist(err) {
 		return "", fmt.Errorf("no .provoke/ directory found. Run 'provoke init' first")
 	}
@@ -65,14 +66,18 @@ func findProjectDir() (string, error) {
 	var dirs []string
 	for _, e := range entries {
 		if e.IsDir() {
-			dirs = append(dirs, filepath.Join(provokDir, e.Name()))
+			dirs = append(dirs, filepath.Join(provokeDir, e.Name()))
 		}
 	}
 	if len(dirs) == 0 {
 		return "", fmt.Errorf("no project found in .provoke/. Run 'provoke init' first")
 	}
 	if len(dirs) > 1 {
-		return "", fmt.Errorf("multiple projects found. Use --project flag to specify one")
+		names := make([]string, len(dirs))
+		for i, d := range dirs {
+			names[i] = filepath.Base(d)
+		}
+		return "", fmt.Errorf("multiple projects found in .provoke/: %v — run from the correct project root", names)
 	}
 	return dirs[0], nil
 }
