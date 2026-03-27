@@ -9,10 +9,10 @@ import (
 )
 
 type Resource struct {
-	Type      string                 `json:"type"`
-	Name      string                 `json:"name"`
+	Type      string         `json:"type"`
+	Name      string         `json:"name"`
 	Params    map[string]any `json:"params"`
-	CreatedAt time.Time              `json:"created_at"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type State struct {
@@ -48,9 +48,12 @@ func (s *State) Save(dir string) error {
 		return fmt.Errorf("marshal state: %w", err)
 	}
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create state dir: %w", err)
 	}
-	return os.WriteFile(stateFilePath(dir), data, 0644)
+	if err := os.WriteFile(stateFilePath(dir), data, 0644); err != nil {
+		return fmt.Errorf("write state: %w", err)
+	}
+	return nil
 }
 
 // tfShowOutput is the minimal shape of `terraform show -json` output.
@@ -58,8 +61,8 @@ type tfShowOutput struct {
 	Values struct {
 		RootModule struct {
 			Resources []struct {
-				Type   string                 `json:"type"`
-				Name   string                 `json:"name"`
+				Type   string         `json:"type"`
+				Name   string         `json:"name"`
 				Values map[string]any `json:"values"`
 			} `json:"resources"`
 		} `json:"root_module"`
@@ -86,9 +89,10 @@ func DeriveFromTFState(jsonPath string, existing *State) (*State, error) {
 		}
 	}
 
-	derived := &State{
-		Project:  existing.Project,
-		Provider: existing.Provider,
+	derived := &State{}
+	if existing != nil {
+		derived.Project = existing.Project
+		derived.Provider = existing.Provider
 	}
 	for _, r := range out.Values.RootModule.Resources {
 		createdAt, ok := existingMap[r.Type+"/"+r.Name]
