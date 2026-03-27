@@ -25,7 +25,10 @@ func (c *ClaudeClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 		"system":     systemPrompt,
 		"messages":   []map[string]string{{"role": "user", "content": userPrompt}},
 	}
-	data, _ := json.Marshal(body)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal claude request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://api.anthropic.com/v1/messages", bytes.NewReader(data))
@@ -36,7 +39,7 @@ func (c *ClaudeClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 	req.Header.Set("anthropic-version", "2023-06-01")
 	req.Header.Set("content-type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("claude request: %w", err)
 	}

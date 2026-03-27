@@ -26,7 +26,10 @@ func (c *OpenAIClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 			{"role": "user", "content": userPrompt},
 		},
 	}
-	data, _ := json.Marshal(body)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal openai request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		"https://api.openai.com/v1/chat/completions", bytes.NewReader(data))
@@ -36,7 +39,7 @@ func (c *OpenAIClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 	req.Header.Set("Authorization", "Bearer "+c.apiKey)
 	req.Header.Set("content-type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("openai request: %w", err)
 	}

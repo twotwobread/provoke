@@ -30,7 +30,10 @@ func (c *OllamaClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 			{"role": "user", "content": userPrompt},
 		},
 	}
-	data, _ := json.Marshal(body)
+	data, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal ollama request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		c.baseURL+"/api/chat", bytes.NewReader(data))
@@ -39,7 +42,7 @@ func (c *OllamaClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 	}
 	req.Header.Set("content-type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("ollama request: %w", err)
 	}
@@ -57,6 +60,9 @@ func (c *OllamaClient) Generate(ctx context.Context, systemPrompt, userPrompt st
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return "", fmt.Errorf("decode ollama response: %w", err)
+	}
+	if result.Message.Content == "" {
+		return "", fmt.Errorf("empty response from ollama")
 	}
 	return ExtractTFContent(result.Message.Content), nil
 }
