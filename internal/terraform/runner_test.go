@@ -7,11 +7,13 @@ import (
 )
 
 type mockExecutor struct {
-	outputs map[string][]byte
-	errors  map[string]error
+	outputs     map[string][]byte
+	errors      map[string]error
+	capturedDir string
 }
 
 func (m *mockExecutor) Run(dir string, args ...string) ([]byte, error) {
+	m.capturedDir = dir
 	key := args[0]
 	if err, ok := m.errors[key]; ok {
 		return nil, err
@@ -36,6 +38,9 @@ func TestPlanSuccess(t *testing.T) {
 	if output == "" {
 		t.Error("expected non-empty plan output")
 	}
+	if exec.capturedDir != "/tmp/project" {
+		t.Errorf("expected dir /tmp/project, got %s", exec.capturedDir)
+	}
 }
 
 func TestApplySuccess(t *testing.T) {
@@ -47,6 +52,21 @@ func TestApplySuccess(t *testing.T) {
 	runner := terraform.NewRunnerWithExecutor("/tmp/project", exec)
 	if err := runner.Apply(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestInitSuccess(t *testing.T) {
+	exec := &mockExecutor{
+		outputs: map[string][]byte{
+			"init": []byte("Terraform has been successfully initialized!"),
+		},
+	}
+	runner := terraform.NewRunnerWithExecutor("/tmp/project", exec)
+	if err := runner.Init(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if exec.capturedDir != "/tmp/project" {
+		t.Errorf("expected dir /tmp/project, got %s", exec.capturedDir)
 	}
 }
 

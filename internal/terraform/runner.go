@@ -24,6 +24,7 @@ type Runner struct {
 	executor Executor
 }
 
+// NewRunner creates a Runner that executes real terraform commands in dir.
 func NewRunner(dir string) *Runner {
 	return &Runner{dir: dir, executor: &osExecutor{}}
 }
