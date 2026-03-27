@@ -36,7 +36,7 @@ func LoadFrom(path string) (*Config, error) {
 func Load() (*Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("resolve home dir: %w", err)
 	}
 	return LoadFrom(filepath.Join(home, ".provoke", "config.yaml"))
 }
