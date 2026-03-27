@@ -11,7 +11,7 @@ import (
 type Resource struct {
 	Type      string                 `json:"type"`
 	Name      string                 `json:"name"`
-	Params    map[string]interface{} `json:"params"`
+	Params    map[string]any `json:"params"`
 	CreatedAt time.Time              `json:"created_at"`
 }
 
@@ -60,7 +60,7 @@ type tfShowOutput struct {
 			Resources []struct {
 				Type   string                 `json:"type"`
 				Name   string                 `json:"name"`
-				Values map[string]interface{} `json:"values"`
+				Values map[string]any `json:"values"`
 			} `json:"resources"`
 		} `json:"root_module"`
 	} `json:"values"`
@@ -96,7 +96,7 @@ func DeriveFromTFState(jsonPath string, existing *State) (*State, error) {
 			createdAt = time.Now().UTC()
 		}
 		// Extract scalar params only (skip nested objects/arrays).
-		params := map[string]interface{}{}
+		params := map[string]any{}
 		for k, v := range r.Values {
 			switch v.(type) {
 			case string, float64, bool:

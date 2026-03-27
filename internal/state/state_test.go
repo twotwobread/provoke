@@ -20,7 +20,7 @@ func TestLoadSave(t *testing.T) {
 			{
 				Type:      "google_container_cluster",
 				Name:      "main",
-				Params:    map[string]interface{}{"node_count": float64(3)},
+				Params:    map[string]any{"node_count": float64(3)},
 				CreatedAt: time.Date(2026, 3, 27, 10, 0, 0, 0, time.UTC),
 			},
 		},
@@ -58,15 +58,15 @@ func TestLoadEmpty(t *testing.T) {
 }
 
 func TestDeriveFromTFState(t *testing.T) {
-	tfstate := map[string]interface{}{
+	tfstate := map[string]any{
 		"format_version": "1.0",
-		"values": map[string]interface{}{
-			"root_module": map[string]interface{}{
-				"resources": []interface{}{
-					map[string]interface{}{
+		"values": map[string]any{
+			"root_module": map[string]any{
+				"resources": []any{
+					map[string]any{
 						"type": "google_container_cluster",
 						"name": "main",
-						"values": map[string]interface{}{
+						"values": map[string]any{
 							"name":     "main-cluster",
 							"location": "us-central1",
 						},
