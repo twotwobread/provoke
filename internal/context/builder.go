@@ -23,8 +23,9 @@ func NewBuilder(s *state.State, tfFile, provider string) *Builder {
 func (b *Builder) SystemPrompt() string {
 	stateStr := "no resources deployed yet"
 	if b.state != nil && len(b.state.Resources) > 0 {
-		data, _ := json.MarshalIndent(b.state.Resources, "", "  ")
-		stateStr = string(data)
+		if data, err := json.MarshalIndent(b.state.Resources, "", "  "); err == nil {
+			stateStr = string(data)
+		}
 	}
 
 	tfStr := "none"

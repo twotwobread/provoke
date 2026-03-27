@@ -32,8 +32,8 @@ func TestSystemPromptContainsState(t *testing.T) {
 	if !strings.Contains(prompt, "gcp") {
 		t.Error("prompt should contain provider")
 	}
-	if !strings.Contains(prompt, "2026-03-27") {
-		t.Error("prompt should contain date")
+	if !strings.Contains(prompt, time.Now().UTC().Format("2006-01-02")) {
+		t.Error("prompt should contain today's date")
 	}
 }
 
